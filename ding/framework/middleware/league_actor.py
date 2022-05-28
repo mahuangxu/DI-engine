@@ -56,7 +56,7 @@ class LeagueActor:
         self._model_updated = True
         task.on("league_job_actor_{}".format(task.router.node_id), self._on_league_job)
         task.on("learner_model", self._on_learner_model)
-        self._policy_resetter = task.wrap(policy_resetter())
+        self._policy_resetter = task.wrap(policy_resetter(self.env_num))
 
     def _on_learner_model(self, learner_model: "LearnerModel"):
         """
@@ -94,7 +94,6 @@ class LeagueActor:
         assert main_player, "Can not find active player"
 
         self.ctx.policies = policies
-        self.ctx.env_num = self.env_num
         self._policy_resetter(self.ctx)
 
         def send_actor_job(episode_info: List):
