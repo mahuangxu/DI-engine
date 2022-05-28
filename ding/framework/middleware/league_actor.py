@@ -1,3 +1,4 @@
+import enum
 from ding.framework import task
 from time import sleep
 import logging
@@ -48,7 +49,7 @@ class LeagueActor:
         self.env_num = self.env.env_num
         self.policy_fn = policy_fn
         self.n_rollout_samples = self.cfg.policy.collect.get("n_rollout_samples") or 0
-        self.n_rollout_samples = 0
+        # self.n_rollout_samples = 128
         self._running = False
         self._collectors: Dict[str, BattleCollector] = {}
         self._policies: Dict[str, "Policy.collect_function"] = {}
@@ -110,17 +111,30 @@ class LeagueActor:
             actor_data = ActorData(env_step=self.ctx.envstep, train_data=train_data)
             task.emit("actor_data_player_{}".format(job.launch_player), actor_data)
 
+        self.ctx.n_episode = None
+        self.ctx.train_iter = main_player.total_agent_step
+        self.ctx.policy_kwargs = None
+        self.ctx.buffered_data = []
+
         if self.n_rollout_samples > 0:
-            pass
+            for i, _ in enumerate(collector(self.ctx)):
+                # Send episode info when each episode finished
+                send_actor_job([self.ctx.one_episode_info])
+                # Send actor data each n_rollout_samples
+                if len(self.ctx.buffered_data >= self.n_rollout_samples):
+                    send_actor_data(self.ctx.buffered_data[:])
+                    self.ctx.buffered_data.clear()
+            # Rest bufferd data
+            if self.ctx.buffered_data:
+                send_actor_data(self.ctx.buffered_data[:])
+                self.ctx.buffered_data.clear()
         else:
-            self.ctx.n_episode = None
-            self.ctx.train_iter = main_player.total_agent_step
-            self.ctx.policy_kwargs = None
-        
-        collector(self.ctx)
-        train_data, episode_info = self.ctx.train_data[0], self.ctx.episode_info[0]  # only use main player data for training
-        send_actor_data(train_data)
-        send_actor_job(episode_info)
+            collector(self.ctx)
+            # for i, _ in enumerate(collector(self.ctx)):
+            #     pass    
+            train_data, episode_info = self.ctx.train_data[0], self.ctx.episode_info[0]  # only use main player data for training
+            send_actor_data(train_data)
+            send_actor_job(episode_info)
         
         task.emit("actor_greeting", task.router.node_id)
         self._running = False

@@ -186,7 +186,7 @@ def battle_inferencer(cfg: EasyDict, env: BaseEnvManager, obs_pool: CachePool, p
 
     return _battle_inferencer
 
-def battle_rolloutor(cfg: EasyDict, obs_pool: CachePool, policy_output_pool:CachePool):
+def battle_rolloutor(cfg: EasyDict, obs_pool: CachePool, policy_output_pool:CachePool, n_rollout_samples: int):
     def _battle_rolloutor(ctx: "OnlineRLContext"):
         timestep = ctx.timestep
         env_id = ctx.env_id
@@ -205,7 +205,13 @@ def battle_rolloutor(cfg: EasyDict, obs_pool: CachePool, policy_output_pool:Cach
                 if cfg.get_train_sample:
                     train_sample = ctx.policies[policy_id].get_train_sample(transitions)
                     ctx.train_data[policy_id].extend(train_sample)
+                    if n_rollout_samples > 0 and policy_id == 0:
+                        for transitions in train_sample:
+                            ctx.buffered_data.append(transitions)
                 else:
                     ctx.train_data[policy_id].append(transitions)
+                    if n_rollout_samples > 0 and policy_id == 0:
+                        ctx.buffered_data.append(transitions)
+
                 ctx.traj_buffer[env_id][policy_id].clear()
     return _battle_rolloutor

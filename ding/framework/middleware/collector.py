@@ -37,7 +37,7 @@ class BattleCollector:
         self.n_rollout_samples = n_rollout_samples
 
         self._battle_inferencer = task.wrap(battle_inferencer(self.cfg, self.env, self.obs_pool, self.policy_output_pool))
-        self._battle_rolloutor = task.wrap(battle_rolloutor(self.cfg, self.obs_pool, self.policy_output_pool))
+        self._battle_rolloutor = task.wrap(battle_rolloutor(self.cfg, self.obs_pool, self.policy_output_pool, self.n_rollout_samples))
     
     def _reset_stat(self, env_id: int, ctx: OnlineRLContext) -> None:
         """
@@ -119,7 +119,6 @@ class BattleCollector:
                 ctx.timestep = timestep
                 with self._timer:
                     self._battle_rolloutor(ctx)
-
                 self.env_info[env_id]['time'] += self._timer.value + interaction_duration
 
                 # If env is done, record episode info and reset
@@ -139,6 +138,11 @@ class BattleCollector:
                     ctx.ready_env_id.remove(env_id)
                     for policy_id in range(ctx.agent_num):
                         ctx.episode_info[policy_id].append(timestep.info[policy_id])
+                        if self.n_rollout_samples > 0 and policy_id == 0:
+                            ctx.one_episode_info = timestep.info[policy_id]
+                    # print(ctx.collected_episode)
+                    # yield
+
             if ctx.collected_episode >= ctx.n_episode:
                 break
         
